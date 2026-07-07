@@ -406,32 +406,53 @@ window.addEventListener('DOMContentLoaded', () => {
   bootData();
 });
 
-function bootData() {
-  Promise.allSettled([callApi('getCategories'), callApi('getSubCategories'), callApi('getSettings'), callApi('getMetalRates')]).then(results => {
-    const [catsR, subsR, settR, ratesR] = results;
-    const cats = catsR.status === 'fulfilled' ? catsR.value : {};
-    const subs = subsR.status === 'fulfilled' ? subsR.value : {};
-    const sett = settR.status === 'fulfilled' ? settR.value : {};
-    const rates = ratesR.status === 'fulfilled' ? ratesR.value : {};
-
-    const failures = results.filter(r => r.status === 'rejected' || (r.value && r.value.success === false));
-    if (failures.length) {
-      console.error('Startup call(s) failed:', failures);
-      toast('Some data failed to load — is Code.gs redeployed as a new version? See console for details.', true);
+// Fires one request at a time (Apps Script gets unreliable when several
+// requests hit it simultaneously), with automatic retries on failure.
+function callApiWithRetry(action, data, retries) {
+  retries = retries === undefined ? 2 : retries;
+  return callApi(action, data).catch(err => {
+    if (retries > 0) {
+      return new Promise(resolve => setTimeout(resolve, 500)).then(() => callApiWithRetry(action, data, retries - 1));
     }
-
-    STATE.categories = cats.categories || [];
-    STATE.subCategories = subs.subCategories || [];
-    STATE.settings = sett.settings || {};
-    STATE.metalRates = rates.rates || [];
-    if (STATE.settings.ShopName) document.getElementById('sidebarShopName').textContent = STATE.settings.ShopName;
-    applyBrandLogo();
-    document.getElementById('itGst').value = STATE.settings.DefaultGSTPercent || 3;
-    populateCategoryDropdowns();
-    populatePurityOptions();
-    loadStockPicker();
-    loadBills();
+    throw err;
   });
+}
+
+async function bootData() {
+  const results = {};
+  const calls = [
+    ['categories', 'getCategories'],
+    ['subCategories', 'getSubCategories'],
+    ['settings', 'getSettings'],
+    ['metalRates', 'getMetalRates']
+  ];
+  const failures = [];
+  for (const [key, action] of calls) {
+    try {
+      results[key] = await callApiWithRetry(action);
+      if (results[key] && results[key].success === false) failures.push({ action, result: results[key] });
+    } catch (err) {
+      failures.push({ action, error: err.message });
+      results[key] = {};
+    }
+  }
+
+  if (failures.length) {
+    console.error('Startup call(s) failed:', failures);
+    toast('Some data failed to load — check console for details, then try refreshing the page.', true);
+  }
+
+  STATE.categories = results.categories.categories || [];
+  STATE.subCategories = results.subCategories.subCategories || [];
+  STATE.settings = results.settings.settings || {};
+  STATE.metalRates = results.metalRates.rates || [];
+  if (STATE.settings.ShopName) document.getElementById('sidebarShopName').textContent = STATE.settings.ShopName;
+  applyBrandLogo();
+  document.getElementById('itGst').value = STATE.settings.DefaultGSTPercent || 3;
+  populateCategoryDropdowns();
+  populatePurityOptions();
+  await loadStockPicker();
+  await loadBills();
 }
 function applyBrandLogo() {
   const el = document.getElementById('sidebarLogo');
@@ -495,7 +516,7 @@ function setItemMode(mode) {
   if (mode === 'stock') loadStockPicker();
 }
 function loadStockPicker() {
-  callApi('getStock', { status: 'In Stock' }).then(res => {
+  return callApi('getStock', { status: 'In Stock' }).then(res => {
     STATE.stock = res.stock || [];
     const sel = document.getElementById('stockPicker');
     sel.innerHTML = '<option value="">— choose an in-stock item —</option>' +
@@ -783,7 +804,7 @@ function confirmFromPreview() {
 function loadBills() {
   const from = document.getElementById('billsFrom').value;
   const to = document.getElementById('billsTo').value;
-  callApi('getBills', { from, to }).then(res => {
+  return callApi('getBills', { from, to }).then(res => {
     const tbody = document.getElementById('billsTableBody');
     if (!res.bills || !res.bills.length) {
       tbody.innerHTML = '<tr><td colspan="7" class="empty-state">No bills found</td></tr>';
