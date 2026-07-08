@@ -369,27 +369,26 @@ const CONFIG = {
 /* =========================================================
    JSONP TRANSPORT
 ========================================================= */
-let jsonpCounter = 0;
 function callApi(action, data) {
-  return new Promise((resolve, reject) => {
-    if (!CONFIG.SCRIPT_URL || CONFIG.SCRIPT_URL.indexOf('PASTE_') === 0) {
-      reject(new Error('Apps Script URL not configured yet. Edit CONFIG.SCRIPT_URL in this file.'));
-      return;
+  if (!CONFIG.SCRIPT_URL || CONFIG.SCRIPT_URL.indexOf('PASTE_') === 0) {
+    return Promise.reject(new Error('Apps Script URL not configured yet. Edit CONFIG.SCRIPT_URL in this file.'));
+  }
+  const params = new URLSearchParams();
+  params.set('action', action);
+  if (data) params.set('data', JSON.stringify(data));
+  const url = CONFIG.SCRIPT_URL + '?' + params.toString();
+  return fetch(url).then(r => {
+    if (!r.ok) throw new Error('Apps Script returned HTTP ' + r.status);
+    return r.text();
+  }).then(text => {
+    try {
+      return JSON.parse(text);
+    } catch (e) {
+      throw new Error('Unexpected response from Apps Script (not JSON): ' + text.slice(0, 200));
     }
-    const cbName = 'jsonp_cb_' + (jsonpCounter++) + '_' + Date.now();
-    window[cbName] = function (result) {
-      resolve(result);
-      delete window[cbName];
-      script.remove();
-    };
-    const params = new URLSearchParams();
-    params.set('action', action);
-    params.set('callback', cbName);
-    if (data) params.set('data', JSON.stringify(data));
-    const script = document.createElement('script');
-    script.src = CONFIG.SCRIPT_URL + '?' + params.toString();
-    script.onerror = () => { reject(new Error('Network error contacting Apps Script')); delete window[cbName]; };
-    document.body.appendChild(script);
+  }).catch(err => {
+    if (err instanceof TypeError) throw new Error('Network error contacting Apps Script');
+    throw err;
   });
 }
 
