@@ -418,23 +418,26 @@ function callApiWithRetry(action, data, retries) {
 }
 
 async function bootData() {
-  const results = {};
   const calls = [
     ['categories', 'getCategories'],
     ['subCategories', 'getSubCategories'],
     ['settings', 'getSettings'],
     ['metalRates', 'getMetalRates']
   ];
+  const settled = await Promise.allSettled(calls.map(([, action]) => callApiWithRetry(action)));
+
+  const results = {};
   const failures = [];
-  for (const [key, action] of calls) {
-    try {
-      results[key] = await callApiWithRetry(action);
-      if (results[key] && results[key].success === false) failures.push({ action, result: results[key] });
-    } catch (err) {
-      failures.push({ action, error: err.message });
+  settled.forEach((s, i) => {
+    const [key, action] = calls[i];
+    if (s.status === 'fulfilled') {
+      results[key] = s.value;
+      if (s.value && s.value.success === false) failures.push({ action, result: s.value });
+    } else {
       results[key] = {};
+      failures.push({ action, error: s.reason && s.reason.message });
     }
-  }
+  });
 
   if (failures.length) {
     console.error('Startup call(s) failed:', failures);
@@ -450,8 +453,7 @@ async function bootData() {
   document.getElementById('itGst').value = STATE.settings.DefaultGSTPercent || 3;
   populateCategoryDropdowns();
   populatePurityOptions();
-  await loadStockPicker();
-  await loadBills();
+  await Promise.all([loadStockPicker(), loadBills()]);
 }
 function applyBrandLogo() {
   const el = document.getElementById('sidebarLogo');
@@ -825,7 +827,7 @@ function reprintBill(billNo) {
     const b = res.bill;
     const bill = {
       billNo: b.BillNo, billDate: b.BillDate, customerName: b.CustomerName, mobile: b.Mobile, address: b.Address,
-      items: res.items.map(it => ({ slNo: it.SlNo, itemName: it.ItemName, purity: it.Purity, goldRate: it.GoldRate, netWeight: it.NetWeight, grossWeight: it.GrossWeight, labourCharge: it.LabourCharge, additionalCost: it.AdditionalCost, gstPercent: it.GSTPercent, itemTotal: it.ItemTotal })),
+      items: res.items.map(it => ({ slNo: it.SlNo, itemName: it.ItemName, metal: it.Metal, purity: it.Purity, goldRate: it.GoldRate, netWeight: it.NetWeight, grossWeight: it.GrossWeight, labourCharge: it.LabourCharge, additionalCost: it.AdditionalCost, gstPercent: it.GSTPercent, itemTotal: it.ItemTotal })),
       subTotalInclGST: b.SubTotalInclGST, makingCharges: b.MakingCharges, discountMakingPercent: b.DiscountMakingPercent,
       discountMakingAmt: b.DiscountMakingAmt, totalGrossWeight: b.TotalGrossWeight, discountGoldPerGm: b.DiscountGoldPerGm,
       discountGoldAmt: b.DiscountGoldAmt, totalDiscount: b.TotalDiscount, total: b.Total, amountPaidAdvance: b.AmountPaidAdvance,
