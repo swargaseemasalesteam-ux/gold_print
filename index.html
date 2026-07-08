@@ -117,11 +117,10 @@ tbody tr:hover{background:var(--bg-panel-2);}
 
 .bill-layout{display:grid;grid-template-columns:1fr 360px;gap:20px;align-items:start;}
 @media(max-width:1000px){.bill-layout{grid-template-columns:1fr;}}
-.item-add-row{display:grid;grid-template-columns:.8fr 1.2fr 1.2fr 1.4fr .8fr 1fr 1fr .9fr .9fr .9fr .7fr auto;gap:8px;align-items:end;margin-bottom:14px;}
+.item-add-row{display:grid;grid-template-columns:repeat(4,1fr);gap:16px 18px;margin-bottom:8px;}
 .item-add-row .field{margin-bottom:0;}
-.item-add-row label{font-size:10px;}
-.item-add-row input,.item-add-row select{padding:8px 9px;font-size:12.5px;}
-@media(max-width:1400px){.item-add-row{grid-template-columns:repeat(2,1fr);}}
+@media(max-width:900px){.item-add-row{grid-template-columns:repeat(2,1fr);}}
+@media(max-width:520px){.item-add-row{grid-template-columns:1fr;}}
 .bill-items-table td{font-size:12.5px;}
 .summary-row{display:flex;justify-content:space-between;padding:9px 0;font-size:13px;border-bottom:1px solid var(--border-soft);}
 .summary-row.total{font-weight:700;font-size:15px;color:var(--gold-bright);border-bottom:none;padding-top:14px;}
@@ -173,6 +172,7 @@ table.inv-table td{border:1px solid #111;padding:5px;text-align:center;}
       <div><div class="brand-name" id="sidebarShopName">Gold Shop</div><div class="brand-tag">Billing</div></div>
     </div>
     <div class="nav-item active" data-page="billing" onclick="go('billing')"><span class="ic">&#128196;</span> New Bill</div>
+    <div class="nav-item" data-page="stock" onclick="go('stock')"><span class="ic">&#9878;</span> Stock</div>
     <div class="nav-item" data-page="bills" onclick="go('bills')"><span class="ic">&#128179;</span> Bill History</div>
   </div>
 
@@ -221,8 +221,8 @@ table.inv-table td{border:1px solid #111;padding:5px;text-align:center;}
               <div class="field"><label>Labour Charge</label><input type="number" id="itLabour" placeholder="0"></div>
               <div class="field"><label>Addl. Cost</label><input type="number" id="itAdditional" placeholder="0"></div>
               <div class="field"><label>GST %</label><input type="number" id="itGst" value="3"></div>
-              <button class="btn btn-gold btn-sm" onclick="addBillItem()" style="height:38px;">+ Add</button>
             </div>
+            <button class="btn btn-gold" onclick="addBillItem()" style="margin-bottom:20px;">+ Add Item</button>
             <datalist id="purityOptions"></datalist>
 
             <div class="hr-gold"></div>
@@ -262,6 +262,29 @@ table.inv-table td{border:1px solid #111;padding:5px;text-align:center;}
           </div>
 
           <button class="btn btn-gold btn-block" style="margin-top:8px;" onclick="previewBill()">Preview Bill</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ---------------- STOCK ---------------- -->
+    <div class="page" id="page-stock">
+      <div class="page-head">
+        <div><h2>Stock</h2><div class="sub">Browse and search current inventory</div></div>
+      </div>
+      <div class="toolbar">
+        <input id="stockSearch" placeholder="Search by item name, product ID, category, purity…" oninput="filterStockView()" style="flex:1;min-width:260px;padding:11px 12px;background:var(--bg-input);border:1px solid var(--border);color:var(--ivory);border-radius:3px;">
+        <div class="pill-tabs">
+          <div class="pill-tab active" id="stockFilterAll" onclick="setStockMetalFilter('All')">All</div>
+          <div class="pill-tab" id="stockFilterGold" onclick="setStockMetalFilter('Gold')">Gold</div>
+          <div class="pill-tab" id="stockFilterSilver" onclick="setStockMetalFilter('Silver')">Silver</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr><th>Product ID</th><th>Metal</th><th>Item</th><th>Category</th><th>Sub-cat</th><th>Purity</th><th>Rate/gm</th><th>Net Wt</th><th>Gross Wt</th><th></th></tr></thead>
+            <tbody id="stockViewTableBody"><tr><td colspan="10" class="empty-state">Loading…</td></tr></tbody>
+          </table>
         </div>
       </div>
     </div>
@@ -504,6 +527,7 @@ function go(page) {
   document.querySelector('.nav-item[data-page="' + page + '"]').classList.add('active');
   if (page === 'bills') loadBills();
   if (page === 'billing') resetBillForm();
+  if (page === 'stock') loadStockView();
 }
 
 /* =========================================================
@@ -525,6 +549,76 @@ function loadStockPicker() {
       STATE.stock.map(s => `<option value="${s.ProductID}">${s.ProductID} — [${s.Metal || 'Gold'}] ${s.ItemName} (${s.Category}${s.SubCategory ? ' / ' + s.SubCategory : ''}, ${s.GrossWeight}gm)</option>`).join('');
   });
 }
+
+/* =========================================================
+   STOCK (browse / search, billing-side read-only view)
+========================================================= */
+let stockMetalFilter = 'All';
+function loadStockView() {
+  const tbody = document.getElementById('stockViewTableBody');
+  tbody.innerHTML = '<tr><td colspan="10" class="empty-state">Loading…</td></tr>';
+  callApi('getStock', { status: 'In Stock' }).then(res => {
+    STATE.stock = res.stock || [];
+    filterStockView();
+  }).catch(err => toast(err.message, true));
+}
+function setStockMetalFilter(metal) {
+  stockMetalFilter = metal;
+  ['All', 'Gold', 'Silver'].forEach(m => document.getElementById('stockFilter' + m).classList.toggle('active', m === metal));
+  filterStockView();
+}
+function filterStockView() {
+  const q = document.getElementById('stockSearch').value.trim().toLowerCase();
+  let list = STATE.stock || [];
+  if (stockMetalFilter !== 'All') list = list.filter(s => (s.Metal || 'Gold') === stockMetalFilter);
+  if (q) {
+    list = list.filter(s => [s.ProductID, s.ItemName, s.Category, s.SubCategory, s.Purity]
+      .some(v => String(v || '').toLowerCase().includes(q)));
+  }
+  renderStockView(list);
+}
+function renderStockView(list) {
+  const tbody = document.getElementById('stockViewTableBody');
+  if (!list.length) {
+    tbody.innerHTML = '<tr><td colspan="10" class="empty-state">No matching stock found</td></tr>';
+    return;
+  }
+  tbody.innerHTML = list.map(s => `
+    <tr>
+      <td class="mono">${s.ProductID}</td>
+      <td><span class="badge ${s.Metal === 'Silver' ? 'badge-silver' : 'badge-gold'}">${s.Metal || 'Gold'}</span></td>
+      <td>${s.ItemName}</td><td>${s.Category}</td><td>${s.SubCategory}</td>
+      <td>${s.Purity}</td><td>${fmtNum(s.GoldRate)}</td><td>${s.NetWeight}</td><td>${s.GrossWeight}</td>
+      <td><button class="btn btn-outline btn-sm" onclick="billThisItem('${s.ProductID}')">Bill This</button></td>
+    </tr>`).join('');
+}
+function billThisItem(productId) {
+  const s = (STATE.stock || []).find(x => x.ProductID === productId);
+  if (!s) return toast('Could not find that item — try refreshing', true);
+  go('billing');
+  setItemMode('stock');
+  document.getElementById('itMetal').value = s.Metal || 'Gold';
+  populatePurityOptions();
+  setSelectValueOrAdd('itCategory', catNameToId(s.Category));
+  refreshSubCatOptions();
+  setSelectValueOrAdd('itSubCategory', subCatNameToId(s.SubCategory));
+  document.getElementById('itName').value = s.ItemName;
+  document.getElementById('itPurity').value = s.Purity;
+  document.getElementById('itRate').value = s.GoldRate;
+  document.getElementById('itNet').value = s.NetWeight;
+  document.getElementById('itGross').value = s.GrossWeight;
+  document.getElementById('itLabour').value = s.LabourCharge;
+  document.getElementById('itAdditional').value = s.AdditionalCost;
+  applyRateForPurity();
+  // loadStockPicker() (triggered by setItemMode above) is async, so make sure
+  // the dropdown ends up pointing at this item once it's populated - this is
+  // what lets the bill correctly mark the stock piece as sold when saved.
+  loadStockPicker().then(() => {
+    document.getElementById('stockPicker').value = productId;
+  });
+  toast('Loaded into Add Item — click + Add Item to add it to the bill');
+}
+
 function onStockPick() {
   const pid = document.getElementById('stockPicker').value;
   const s = STATE.stock.find(x => x.ProductID === pid);
