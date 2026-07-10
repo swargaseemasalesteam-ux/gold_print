@@ -121,6 +121,26 @@ tbody tr:hover{background:var(--bg-panel-2);}
 .item-add-row .field{margin-bottom:0;}
 @media(max-width:900px){.item-add-row{grid-template-columns:repeat(2,1fr);}}
 @media(max-width:520px){.item-add-row{grid-template-columns:1fr;}}
+
+/* ---- responsive shell: sidebar becomes a horizontal top bar on tablet/phone ---- */
+@media(max-width:860px){
+  #app{grid-template-columns:1fr;}
+  .sidebar{
+    position:sticky;top:0;z-index:50;width:100%;height:auto;
+    flex-direction:row;align-items:center;gap:2px;
+    padding:10px 14px;overflow-x:auto;-webkit-overflow-scrolling:touch;
+    border-right:none;border-bottom:1px solid var(--border);
+  }
+  .brand{border-bottom:none;margin-bottom:0;padding:0 14px 0 0;margin-right:8px;border-right:1px solid var(--border-soft);flex-shrink:0;}
+  .nav-item{margin-bottom:0;flex-shrink:0;white-space:nowrap;border-left:none;border-bottom:2px solid transparent;}
+  .nav-item.active{border-left:none;border-bottom-color:var(--gold);}
+  .main{padding:18px 16px 40px;}
+  .page-head{flex-direction:column;align-items:flex-start;}
+}
+@media(max-width:480px){
+  .page-head h2{font-size:20px;}
+  .card{padding:14px 16px;}
+}
 .bill-items-table td{font-size:12.5px;}
 .summary-row{display:flex;justify-content:space-between;padding:9px 0;font-size:13px;border-bottom:1px solid var(--border-soft);}
 .summary-row.total{font-weight:700;font-size:15px;color:var(--gold-bright);border-bottom:none;padding-top:14px;}
