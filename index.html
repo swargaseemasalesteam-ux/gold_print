@@ -116,7 +116,8 @@ tbody tr:hover{background:var(--bg-panel-2);}
 .modal-close-row{display:flex;justify-content:flex-end;gap:10px;margin-top:20px;}
 
 .bill-layout{display:grid;grid-template-columns:1fr 360px;gap:20px;align-items:start;}
-@media(max-width:1000px){.bill-layout{grid-template-columns:1fr;}}
+.bill-summary-card{position:sticky;top:20px;}
+@media(max-width:1000px){.bill-layout{grid-template-columns:1fr;}.bill-summary-card{position:static;}}
 .item-add-row{display:grid;grid-template-columns:repeat(4,1fr);gap:16px 18px;margin-bottom:8px;}
 .item-add-row .field{margin-bottom:0;}
 @media(max-width:900px){.item-add-row{grid-template-columns:repeat(2,1fr);}}
@@ -132,7 +133,8 @@ tbody tr:hover{background:var(--bg-panel-2);}
     border-right:none;border-bottom:1px solid var(--border);
   }
   .brand{border-bottom:none;margin-bottom:0;padding:0 14px 0 0;margin-right:8px;border-right:1px solid var(--border-soft);flex-shrink:0;}
-  .nav-item{margin-bottom:0;flex-shrink:0;white-space:nowrap;border-left:none;border-bottom:2px solid transparent;}
+  .brand-tag{display:none;}
+  .nav-item{margin-bottom:0;flex-shrink:0;white-space:nowrap;border-left:none;border-bottom:2px solid transparent;padding:9px 10px;}
   .nav-item.active{border-left:none;border-bottom-color:var(--gold);}
   .main{padding:18px 16px 40px;}
   .page-head{flex-direction:column;align-items:flex-start;}
@@ -256,7 +258,7 @@ table.inv-table td{border:1px solid #111;padding:5px;text-align:center;}
           </div>
         </div>
 
-        <div class="card" style="position:sticky;top:20px;">
+        <div class="card bill-summary-card">
           <div class="card-head"><h3>Bill Summary</h3></div>
           <div class="summary-row"><span>Sub-total (incl. GST)</span><span class="amt">&#8377;<span id="sumSubTotal">0</span></span></div>
           <div class="summary-row"><span>Making Charges</span><span class="amt">&#8377;<span id="sumMaking">0</span></span></div>
