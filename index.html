@@ -71,6 +71,10 @@ h1,h2,h3,h4{font-family:var(--font-display);font-weight:700;margin:0;color:var(-
 .sidebar-foot .note{font-size:11px;color:var(--muted-2);margin-bottom:10px;padding:0 4px;line-height:1.4;}
 
 .main{padding:26px 32px 60px;overflow-x:hidden;min-width:0;}
+/* belt-and-suspenders: nothing inside the main content area should be able
+   to force the page wider than the viewport, regardless of its content */
+.main *{min-width:0;}
+.main img,.main svg{max-width:100%;}
 .page{display:none;}
 .page.active{display:block;}
 .page-head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:22px;flex-wrap:wrap;gap:10px;}
